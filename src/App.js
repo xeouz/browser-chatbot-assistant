@@ -6,14 +6,18 @@ import './App.css';
 import ChatMessage from './ChatMessage';
 import Iframe from 'react-iframe';
 
+function formatChats(chats) {
+
+}
+
 function App() {
   const [sizes, setSizes] = useState(["45%", "55%"]);
   const [introMessageVisibility, setIntroMessageVisibility] = useState(true)
   const [convoChats, setConvoChats] = useState([]);
   const [inputURL, setInputURL] = useState("")
   const [inputEmail, setInputEmail] = useState("")
-  const [inputUsername, setInputUsername] = useState("")
-  const [isLoggedIn, setIsLoggedIn] = useState(true)
+  const [inputUsername, setInputUsername] = useState("User")
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   function onRefreshClick() {
     window.location.reload()
@@ -27,15 +31,40 @@ function App() {
   }
 
   function isValidEmail(email) {
-    return String(email)
+    let valid =  String(email)
     .toLowerCase()
     .match(
       /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
     );
+
+    if(!valid) {
+      const element = document.getElementById('email')
+
+      element.classList.remove('animate-shake'); // reset animation
+      void element.offsetWidth; // trigger reflow
+      element.classList.add('animate-shake'); // start animation
+    }
+
+    return valid
+  }
+
+  function isValidUsername(username) {
+    if (username != "")
+      return true
+
+    const element = document.getElementById('username')
+
+    element.classList.remove('animate-shake'); // reset animation
+    void element.offsetWidth; // trigger reflow
+    element.classList.add('animate-shake'); // start animation
+
+    return false
   }
 
   function loginEmail(email, username) {
-    if(!email)
+    let em = isValidEmail(email)
+    let us = isValidUsername(username)
+    if(!em || !us)
       return;
 
     setInputEmail(email);
@@ -118,13 +147,7 @@ function App() {
       const data = e.target.value;
       e.preventDefault()
       
-      if(!isValidEmail(data)) {
-        const element = document.getElementById('email')
-
-        element.classList.remove('animate-shake'); // reset animation
-        void element.offsetWidth; // trigger reflow
-        element.classList.add('animate-shake'); // start animation
-      }
+      isValidEmail(data)
     }
   }
 
@@ -133,14 +156,13 @@ function App() {
       const data = e.target.value;
       e.preventDefault()
       
-      if(data === "") {
-        const element = document.getElementById('email')
-
-        element.classList.remove('animate-shake'); // reset animation
-        void element.offsetWidth; // trigger reflow
-        element.classList.add('animate-shake'); // start animation
-      }
+      isValidUsername(data)
     }
+  }
+
+  function onLoginSubmit(e) {
+    e.preventDefault();
+    loginEmail(document.getElementById('email').value, document.getElementById('username').value)
   }
   
   useEffect(() => {
@@ -157,7 +179,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header overflow-hidden z-0">
-        <div id="modal"className={"absolute flex flex-col h-[60%] w-[25%] bg-gradient-to-b from-darkindigo to-medindigo via-baseindigo border-lightindigo border-[2px] drop-shadow-2xl z-50 rounded-[1rem] bg-opacity-35 " + (isLoggedIn?"hidden":"visible")}>
+        <div id="modal"className={"absolute flex flex-col h-[56%] w-[25%] bg-gradient-to-b from-darkindigo to-medindigo via-baseindigo border-lightindigo border-[2px] drop-shadow-2xl z-50 rounded-[1rem] bg-opacity-35 " + (isLoggedIn?"hidden":"visible")}>
           <p className='font-google font-bold tracking-normal p-8 text-center text-5xl border-b-4 border-b-lightindigo bg-gradient-to-br from-slate-100 from-30% to-slate-700 text-transparent bg-clip-text inline-block'>Sign in</p>
           <div className='flex-1 flex flex-col'>
             <form className='flex flex-col space-y-3 p-8 text-left font-google font-medium text-xl'>
@@ -165,8 +187,9 @@ function App() {
               <input type="email" id="email" onKeyDown={onEmailEnter} required className={'rounded-lg bg-lightindigo border-lighterindigo border animate-shake invalid:border-red-500 invalid:border-2'} placeholder='example@abc.com' />
               <p className='pt-6'>Your username</p>
               <input type="text" id="username" onKeyDown={onEmailEnter} required className={'rounded-lg bg-lightindigo border-lighterindigo border animate-shake invalid:border-red-500 invalid:border-2'} placeholder='Username' />
-              <div className='flex flex-col justify-center items-center bg-gradient-to-b from-lighterindigo to-lightindigo rounded-xl h-16'>
-                <button className='text-left text-3xl font-bold tracking-wide bg-gradient-to-br from-indigo-400 via-rose-400 to-[200%] hover:from-rose-400 hover:to-indigo-400 transition-all duration-300 bg-clip-text text-transparent inline-block'>Submit</button>
+              <p className='pt-6'></p>
+              <div onClick={onLoginSubmit} className='flex flex-col justify-center items-center bg-gradient-to-b from-lighterindigo to-lightindigo rounded-xl h-20 w-[70%] self-center hover:scale-105 hover:drop-shadow-2xl transition-all hover:cursor-pointer group'>
+                <button className='text-left text-4xl font-bold tracking-normal bg-gradient-to-br from-indigo-400 to-indigo-400 via-rose-400 bg-[length:500%] group-hover:bg-right bg-left transition-all duration-500 bg-clip-text text-transparent inline-block'>Submit</button>
               </div>
             </form>
           </div>
@@ -203,8 +226,8 @@ function App() {
             <Pane minSize="45%" maxSize="60%">
               <div id="chatscreen" className="h-dvh bg-gradient-radial to-darkerindigo from-0% from-darkindigo to-70% items-stretch flex flex-col animate-in fade-in-50 zoom-in-95 duration-700 ease-out">
                 <div id="intromsg" className={"select-none h-max flex-1 flex-col flex space-y-2 opacity-80 items-center z-30 pt-7 scale-[125%] " + (introMessageVisibility?"visible":"hidden")}>
-                  <p className="font-google font-bold text-left tracking-tighter text-3xl mt-7 lg:text-4xl xl:text-5xl lg:mt-10 2xl:text-6xl xl:mt-14 bg-gradient-to-br from-30% to-90% from-indigo-400 to-rose-400 text-transparent bg-clip-text inline-block">
-                    Hello, Varsha!
+                  <p className="font-google overflow-hidden max-w-[65%] whitespace-nowrap text-ellipsis font-bold text-left tracking-tighter text-3xl mt-7 lg:text-4xl xl:text-5xl lg:mt-10 2xl:text-6xl xl:mt-14 bg-gradient-to-br from-30% to-90% from-indigo-400 to-rose-400 text-transparent bg-clip-text inline-block">
+                    Hello, {inputUsername.split(" ")[0].substring(0, Math.min(8, inputUsername.length))}!
                   </p>
                   <p className="font-google pb-5 font-bold text-left tracking-tighter text-2xl lg:text-3xl xl:text-4xl 2xl:text-5xl bg-gradient-to-b opacity-70 from-gray-400 to-gray-500 text-transparent bg-clip-text inline-block">
                     How can I help you today?
@@ -218,7 +241,7 @@ function App() {
                 </div>
 
                 <form className={'p-8 pt-12 h-full zoom-input flex align-top justify-center border-none outline-none bg-transparent ' + (introMessageVisibility?"visible":"hidden")}>
-                  <input id="webinput" type="url" required rows="1" onKeyDown={onLinkSubmit} class={"hover:opacity-95 focus:opacity-95 focus:border-none focus:ring-0 transition-opacity tracking-wide text-left text-xl font-google font-semibold outline outline-1 outline-lighterindigo opacity-70 text-opacity-90 mx-4 py-6 px-6 resize-none h-[4.3rem] overflow-hidden w-[37rem] rounded-[2.2rem] bg-baseindigo focus:bg-lightindigo text-blue-300 caret-slate-200 whitespace-pre"} placeholder={"Where to? Enter the website link and let's begin..."}/>
+                  <input id="webinput" type="url" required rows="1" onKeyDown={onLinkSubmit} class={"hover:opacity-95 focus:opacity-95 focus:border-none focus:ring-0 transition-opacity tracking-wide text-left 2xl:text-xl text-lg font-google font-semibold outline outline-1 outline-lighterindigo opacity-70 text-opacity-90 mx-4 py-6 px-6 resize-none h-[4.3rem] overflow-hidden w-[37rem] rounded-[2.2rem] bg-baseindigo focus:bg-lightindigo text-blue-300 caret-slate-200 whitespace-pre"} placeholder={"Where to? Enter the website link and let's begin..."}/>
                 </form>
 
                 <form className={'p-8 pb-2.5 flex items-center align-middle justify-center border-none outline-none bg-transparent ' + (inputURL==""?"opacity-25 select-none pointer-events-none":"opacity-100")}>
