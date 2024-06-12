@@ -5,19 +5,73 @@ import 'split-pane-react/esm/themes/default.css';
 import './App.css';
 import ChatMessage from './ChatMessage';
 import Iframe from 'react-iframe';
+import queryString from 'query-string';
 
-function formatChats(chats) {
+const api_url = "https://alien-sensible-centrally.ngrok-free.app/"
 
+function formatChats(content, chats) {
+  let out = "###Instruction: You are a kind and helpful chatbot. Assist the user who is navigating a website. Be very concise.\n\n"
+  out +=    "###Website Content: " + content + "\n\n"
+  out +=    "###Chats: \n\n"
+  
+  for(let c of chats) {
+    out += c.author.toUpperCase() + ": " + c.content + "\n";
+  }
+
+  out += "BOT: ";
+
+  return out
+}
+
+function createPromptURL(prompt) {
+  const url = api_url + "prompt";
+  return queryString.stringifyUrl({url:url, query:{inp: prompt, instruction: "You are an AI assistant. Your name is Chatbot. You will be given a task. You will be provided webtext as context. You must generate a detailed and correct answer. Be friendly and answer the input question appropriately."}})
+}
+
+function createTextURL(weburl) {
+  const url = api_url + "get_text"
+  return queryString.stringifyUrl({url:url, query:{url:weburl}})
+}
+
+function callPrompt(prompt, callback) {
+  fetch(createPromptURL(prompt), {
+    method: "GET",
+    headers: {
+      "Content-type": "application/json; charset=UTF-8"
+    }
+  })
+    .then((response) => response.json())
+    .then((json) => {
+      let split = json['result'][0].split('### Response:')
+      if(split.length < 1)
+        return;
+
+      let text = split[1].trim().replace(/<\/[^>]+(>|$)/g, "")
+      callback(text)
+    });
+    //callback(json['result'][0].split('### Response:')[-1].trim().replace(/<\/[^>]+(>|$)/g, ""))
+}
+
+function callGetText(weburl, callback) {
+  fetch(createTextURL(weburl), {
+    method: "GET",
+    headers: {
+      "Content-type": "application/json; charset=UTF-8"
+    }
+  })
+    .then((response) => response.json())
+    .then((json) => callback(json));
 }
 
 function App() {
   const [sizes, setSizes] = useState(["45%", "55%"]);
   const [introMessageVisibility, setIntroMessageVisibility] = useState(true)
-  const [convoChats, setConvoChats] = useState([]);
+  const [chatDivs, setChatDivs] = useState([]);
   const [inputURL, setInputURL] = useState("")
   const [inputEmail, setInputEmail] = useState("")
   const [inputUsername, setInputUsername] = useState("User")
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [webtext, setWebtext] = useState("")
 
   function onRefreshClick() {
     window.location.reload()
@@ -28,6 +82,7 @@ function App() {
   function loadURL(url) {
     setIntroMessageVisibility(false)
     setInputURL(url)
+    callGetText(url, (json) => setWebtext(json['content']))
   }
 
   function isValidEmail(email) {
@@ -82,15 +137,16 @@ function App() {
 
     let chatObject = {content: text, timestamp: Date.now(), author: author}
 
-    setChats([...chats, chatObject])
-    console.log(chats)
+    setChats(chats => [...chats, chatObject])
+
+    if(author == "user") {
+      callPrompt(text, (response) => addBotChat(response))
+    }
 
     return 1
   }
 
   function addUserChat(inp) {
-    setTimeout(() => addBotChat("BOT: "+inp.trim()), 200)
-
     return addChatInner(inp, "user")
   }
 
@@ -110,9 +166,10 @@ function App() {
 
   function onChatsChange() {
     const latest_chat = chats.at(-1)
+
     if (latest_chat)
     {
-      setConvoChats([...convoChats, ChatMessage(latest_chat['content'], latest_chat['author'])])
+      setChatDivs([...chatDivs, ChatMessage(latest_chat['content'], latest_chat['author'])])
     }
   }
 
@@ -189,7 +246,7 @@ function App() {
               <input type="text" id="username" onKeyDown={onEmailEnter} required className={'rounded-lg bg-lightindigo border-lighterindigo border animate-shake invalid:border-red-500 invalid:border-2'} placeholder='Username' />
               <p className='pt-6'></p>
               <div onClick={onLoginSubmit} className='flex flex-col justify-center items-center bg-gradient-to-b from-lighterindigo to-lightindigo rounded-xl h-20 w-[70%] self-center hover:scale-105 hover:drop-shadow-2xl transition-all hover:cursor-pointer group'>
-                <button className='text-left text-4xl font-bold tracking-normal bg-gradient-to-br from-indigo-400 to-indigo-400 via-rose-400 bg-[length:500%] group-hover:bg-right bg-left transition-all duration-500 bg-clip-text text-transparent inline-block'>Submit</button>
+                <button className='text-left text-4xl font-bold tracking-normal duration-500 bg-gradient-to-br from-slate-300 to-indigo-400 via-rose-400 from-50% group-hover:from-0% bg-[length:500%] group-hover:bg-right bg-left transition-all bg-clip-text text-transparent inline-block'>Submit</button>
               </div>
             </form>
           </div>
@@ -223,7 +280,7 @@ function App() {
           </div>
 
           <SplitPane split="vertical" sizes={sizes} resizerSize={4} onChange={setSizes} className="divide-x-8 divide-lightindigo divide-opacity-10">
-            <Pane minSize="45%" maxSize="60%">
+            <Pane minSize="40%" maxSize="60%">
               <div id="chatscreen" className="h-dvh bg-gradient-radial to-darkerindigo from-0% from-darkindigo to-70% items-stretch flex flex-col animate-in fade-in-50 zoom-in-95 duration-700 ease-out">
                 <div id="intromsg" className={"select-none h-max flex-1 flex-col flex space-y-2 opacity-80 items-center z-30 pt-7 scale-[125%] " + (introMessageVisibility?"visible":"hidden")}>
                   <p className="font-google overflow-hidden max-w-[65%] whitespace-nowrap text-ellipsis font-bold text-left tracking-tighter text-3xl mt-7 lg:text-4xl xl:text-5xl lg:mt-10 2xl:text-6xl xl:mt-14 bg-gradient-to-br from-30% to-90% from-indigo-400 to-rose-400 text-transparent bg-clip-text inline-block">
@@ -237,7 +294,7 @@ function App() {
                 <div className={"animate-in fade-in duration-300 h-40 z-30 font-google font-bold tracking-tighter bg-gradient-to-br from-lighterindigo via-indigo-400 to-rose-400 from-20% to-80% bg-clip-text text-transparent inline-block text-opacity-80 p-7 text-6xl " + (introMessageVisibility?"hidden":"visible")}>Conversation</div>
                 <div className={"animate-in fade-in duration-300 h-40 z-20 -mt-[9rem] p-5 drop-shadow-2xl opacity-90 bg-gradient-to-r from-darkindigo via-medindigo to-darkindigo outline outline-1 outline-lightindigo " + (introMessageVisibility?"hidden":"visible")}/>
                 <div id="conversation" className={"flex overflow-x-hidden overflow-y-scroll flex-col px-5 h-full relative pt-[10rem] -mb-[8rem] -top-[8rem] " + (introMessageVisibility?"hidden":"visible")}>
-                  {convoChats}
+                  {chatDivs}
                 </div>
 
                 <form className={'p-8 pt-12 h-full zoom-input flex align-top justify-center border-none outline-none bg-transparent ' + (introMessageVisibility?"visible":"hidden")}>
@@ -245,7 +302,7 @@ function App() {
                 </form>
 
                 <form className={'p-8 pb-2.5 flex items-center align-middle justify-center border-none outline-none bg-transparent ' + (inputURL==""?"opacity-25 select-none pointer-events-none":"opacity-100")}>
-                  <div id="chat" contentEditable={inputURL==""?"false":"true"} onKeyDownCapture={onTextSubmit} rows="1" class={(inputURL==""?"":"focus:opacity-95 hover:opacity-95") + " transition-opacity text-left text-base font-google outline outline-1 outline-lighterindigo opacity-90 text-opacity-95 mx-4 py-5 px-5 resize-none h-auto min-h-[3.6rem] max-h-[10rem] overflow-hidden w-[37rem] rounded-[2.2rem] bg-baseindigo focus:bg-lightindigo text-slate-200"} data-text={inputPlaceholder}>
+                  <div id="chat" suppressContentEditableWarning={true} contentEditable={inputURL==""?"false":"true"} onKeyDownCapture={onTextSubmit} rows="1" class={(inputURL==""?"":"focus:opacity-95 hover:opacity-95") + " transition-opacity text-left text-base font-google outline outline-1 outline-lighterindigo opacity-90 text-opacity-95 mx-4 py-5 px-5 resize-none h-auto min-h-[3.6rem] max-h-[10rem] overflow-hidden w-[37rem] rounded-[2.2rem] bg-baseindigo focus:bg-lightindigo text-slate-200"} data-text={inputPlaceholder}>
                     {inputURL==""?inputPlaceholder:""}
                   </div>
                 </form>
@@ -254,10 +311,10 @@ function App() {
               </div>
             </Pane>
 
-            <Pane minSize="40%" maxSize="55%">
+            <Pane minSize="40%" maxSize="60%">
               <div className="h-dvh bg-gradient-radial to-darkerindigo from-0% from-darkindigo to-80% flex-col flex justify-center items-center mx-4">
                 <div id='webframe' className={"w-[95%] h-[70%] rounded-2xl relative " + (inputURL==""?"hidden":"visible")}>
-                  <div className='flex flex-row pt-3 justify-center h-[3.6rem] z-30 absolute left-[-1px] right-[-1px] rounded-t-2xl bg-opacity-50 border-b-4 border-opacity-30 border-lighterindigo bg-medindigo backdrop-blur-sm backdrop-filter'>
+                  <div className='flex flex-row pt-3 justify-center h-[3.6rem] z-30 absolute left-[-1px] right-[-1px] bg-slate-100 rounded-t-2xl bg-opacity-[25%] border-b-4 border-opacity-30 border-lighterindigo backdrop-blur-sm backdrop-filter'>
                     <p onClick={onWebLinkClick} className='font-semibold font-google text-baseindigo opacity-60 hover:opacity-95 transition-all duration-200 tracking-tighter text-xl select-none peer-hover:underline hover:underline hover:cursor-pointer'>
                       {inputURL}
                       <i className='material-icons md-link md-dark px-1 align-middle'/>
